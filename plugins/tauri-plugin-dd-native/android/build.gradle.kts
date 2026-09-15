@@ -3,6 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 // `compileOnly(project(":tauri-android"))` below refers to the Tauri
 // runtime module that `tauri android init` wires into settings.gradle.kts
 // automatically when it discovers this plugin (via the path dependency in
@@ -23,8 +25,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
     }
 }
 
