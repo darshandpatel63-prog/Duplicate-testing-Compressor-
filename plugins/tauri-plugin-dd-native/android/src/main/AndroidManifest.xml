@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Required for ads to load when online, and for this plugin's own
+         connectivity check that skips ads entirely when offline. This app's
+         compression engine itself needs neither — see PRIVACY.md. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application>
+        <!--
+          ====================================================================
+          REPLACE BEFORE PUBLISHING. This is Google's official TEST AdMob
+          App ID (safe to build and test with — see AdUnitIds.kt for the
+          matching test ad unit IDs). Replace with your own AdMob App ID
+          from https://apps.admob.com before a release build you intend to
+          publish; the app will crash on startup in a release build that
+          still has a test ID here, by AdMob SDK design (this is intentional
+          — Google will not let a real published app run on test IDs).
+          ====================================================================
+        -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713" />
+
+        <!-- AdMob is required to declare whether the app targets a
+             general audience for ad requests; this app is a general-purpose
+             utility, not directed at children (see PRIVACY.md "Children's
+             privacy"). -->
+        <meta-data
+            android:name="com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT"
+            android:value="false" />
+
+        <!-- Lets the native side hand a compressed file to the Share sheet
+             without granting broad file access — only this specific file,
+             only while the share sheet is open. Mirrors what the old
+             Capacitor Share plugin did via its own FileProvider.
+
+             android:name points at DdFileProvider (a trivial subclass,
+             see DdFileProvider.kt), not androidx.core.content.FileProvider
+             directly — Tauri's own generated app template already
+             declares a default FileProvider under that exact class name,
+             and the manifest merger matches <provider> elements by
+             android:name, not by authority. Using our own subclass gives
+             this a distinct identity so both can coexist; nothing about
+             the actual file-access scope below changes. -->
+        <provider
+            android:name="com.darshan.compressor.nativebridge.DdFileProvider"
+            android:authorities="${applicationId}.ddfileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/dd_file_paths" />
+        </provider>
+    </application>
+</manifest>

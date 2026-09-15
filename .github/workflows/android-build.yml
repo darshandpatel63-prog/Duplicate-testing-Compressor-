@@ -1,0 +1,147 @@
+name: Build Android app
+
+# Builds the Android app entirely on GitHub's servers — no Android Studio,
+# Rust, or SDK needed on your own device, the same way the project's old
+# Capacitor build-apk.yml worked. Trigger it from the Actions tab (or push
+# to main), then download the APK/AAB from the finished run's "Artifacts"
+# section — all doable from a phone browser. See README "Building the
+# Android app" for the full walkthrough, including one-time setup.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "src-tauri/**"
+      - "plugins/**"
+      - "icon-source/**"
+      - ".github/workflows/android-build.yml"
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      # NDK r28+ is what makes the build produce 16KB-memory-page-aligned
+      # native libraries — a Google Play requirement for new/updated apps.
+      # See plugins/tauri-plugin-dd-native/android/build.gradle.kts for
+      # where this connects to the rest of the build.
+      #
+      # local-cache is deliberately OFF. nttld/setup-ndk's cache for recent
+      # NDK versions has a confirmed failure mode: a "hit" can restore a
+      # tree containing the small per-API clang *wrapper scripts* (e.g.
+      # aarch64-linux-android26-clang) without the actual `clang` binary
+      # those scripts exec — the build gets well into compiling before
+      # failing with "clang: No such file or directory", which is exactly
+      # what happened here. The cache only saves on the order of tens of
+      # seconds on a multi-minute job, so it isn't worth that failure mode
+      # — see https://github.com/water-rs/waterui/issues/284 for another
+      # project hitting this same action/error and landing on the same fix.
+      - name: Set up Android NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r28
+          local-cache: false
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install the Tauri CLI
+        run: npm install
+
+      - name: Initialize the Android project
+        run: npx tauri android init
+        env:
+          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+
+      - name: Generate app icons from source artwork
+        run: npx tauri icon icon-source/app-icon-1024.png
+
+      # Belt-and-braces: forces the exact API level Play Store currently
+      # requires (Android 16 / API 36, required since Aug 31, 2026),
+      # regardless of what the installed Tauri CLI's own template
+      # defaults to. See README "If the Android build fails" if this
+      # sed pattern ever stops matching a future template's formatting.
+      - name: Ensure compileSdk/targetSdk 36
+        run: |
+          sed -i -E 's/compileSdk\s*=\s*[0-9]+/compileSdk = 36/' src-tauri/gen/android/app/build.gradle.kts
+          sed -i -E 's/targetSdk\s*=\s*[0-9]+/targetSdk = 36/' src-tauri/gen/android/app/build.gradle.kts
+
+      - name: Build debug APK (unsigned, always builds — good for sideloading/testing)
+        run: npx tauri android build --apk --debug
+        env:
+          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DD-Compressor-debug-apk
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
+
+      # Release builds need your own signing key — see README "Signing a
+      # release build" for how to generate one and add these four repo
+      # secrets. Until they're added, this step (and the two after it) are
+      # skipped and only the debug APK above is produced — the workflow
+      # still succeeds either way.
+      - name: Set up release signing
+        if: ${{ env.HAS_SIGNING == 'true' }}
+        env:
+          HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > src-tauri/gen/android/release.keystore
+          cat > src-tauri/gen/android/keystore.properties << PROPS
+          password=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          storeFile=release.keystore
+          PROPS
+
+      - name: Build signed release (AAB for Play Store, APK for other stores/direct install)
+        if: ${{ env.HAS_SIGNING == 'true' }}
+        env:
+          HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          npx tauri android build --aab
+          npx tauri android build --apk
+
+      - name: Upload signed release artifacts
+        if: ${{ env.HAS_SIGNING == 'true' }}
+        env:
+          HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: DD-Compressor-release
+          path: |
+            src-tauri/gen/android/app/build/outputs/bundle/**/*.aab
+            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
+          

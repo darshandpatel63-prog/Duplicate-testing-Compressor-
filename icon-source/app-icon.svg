@@ -1,0 +1,37 @@
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    DD Compressor app icon — concept notes (see README "App icon"):
+    Full-bleed graphite square (matches the app's own --bg), a single
+    two-triangle "squeeze" mark in the app's brass accent, meeting at a
+    thin teal seam — literally the product's function (two sides pressing
+    inward) rather than a generic gradient blob or lettermark. No text:
+    Play/Amazon/Samsung/Xiaomi icon guidelines all discourage text in the
+    icon itself since it's illegible at launcher size, which is also why
+    the previous icon (kept at web/assets/dd-compressor-icon-512.png for
+    reference) was replaced rather than reused.
+    Symbol sits in the centered ~58% safe zone so Android's adaptive-icon
+    masking (circle/squircle/rounded-square, varies by OEM launcher) never
+    clips it — see README for how `tauri icon` turns this one source file
+    into every platform's required sizes, including adaptive layers.
+  -->
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#181b21"/>
+      <stop offset="100%" stop-color="#111318"/>
+    </linearGradient>
+    <linearGradient id="markGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f0b563"/>
+      <stop offset="100%" stop-color="#e3a24a"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#bgGrad)"/>
+
+  <!-- upper chevron: flat edge up top, point aiming down toward center -->
+  <polygon points="322,336 702,336 512,494" fill="url(#markGrad)"/>
+  <!-- lower chevron: flat edge at bottom, point aiming up toward center -->
+  <polygon points="322,688 702,688 512,530" fill="url(#markGrad)"/>
+
+  <!-- teal seam where the two sides meet — the "compressed" result line -->
+  <rect x="392" y="500" width="240" height="24" rx="12" fill="#5eb6a4"/>
+</svg>

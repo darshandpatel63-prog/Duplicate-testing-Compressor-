@@ -1,0 +1,84 @@
+/*
+  App shell — rules that ONLY apply inside the installed Android app
+  (html.is-app, set by js/platform.js). Everything here is scoped so the
+  website (html.is-web) renders exactly as it did before this project
+  added a native app — see README "Web vs. app UI/UX" for the reasoning
+  behind each difference below. This file loads after styles.css and only
+  ever narrows/adjusts, never redefines, the shared design system.
+*/
+
+html.is-app body {
+  /* No pull-to-refresh / rubber-band bounce — a WebView filling the whole
+     screen should feel like a native surface, not a browser tab. */
+  overscroll-behavior: none;
+}
+
+/* Status bar / gesture-nav clearance. --safe-top/--safe-bottom are set by
+   platform.js from env(safe-area-inset-*) — this only has any effect on
+   devices with a notch/punch-hole or gesture bar, and is 0px otherwise. */
+html.is-app .wrap {
+  padding-top: var(--safe-top, 0px);
+}
+html.is-app footer {
+  padding-bottom: calc(26px + var(--safe-bottom, 0px));
+}
+
+/* A returning app user already chose to install this — the persuasive
+   marketing copy that makes sense on a first-time website visit ("here's
+   why this is private, here's why to trust it") is no longer the thing
+   standing between them and compressing a file. Get out of the way faster:
+   smaller heading, no supporting paragraph, straight to the tool. The full
+   explanation is still one tap away in the menu's "How this app works". */
+html.is-app .hero {
+  padding: 16px 0 4px;
+}
+html.is-app .hero h1 {
+  font-size: clamp(22px, 6vw, 26px);
+  max-width: 22ch;
+}
+html.is-app .hero p {
+  display: none;
+}
+html.is-app .privacy-pill,
+html.is-app .stat-pill {
+  margin-top: 12px;
+}
+
+/* The header's text links (Formats / Privacy / Source) exist for a website
+   visitor scanning for where to click. Inside the app, the hamburger menu
+   already reaches all of this (and more — Terms, Disclaimer, Ad choices) —
+   showing both reads as a duplicated, un-native nav pattern. Brand + menu
+   button only, like a standard native app bar. */
+html.is-app .header-links {
+  display: none;
+}
+
+/* Touch targets get a bit more breathing room than a mouse cursor needs —
+   this is the one place "app-appropriate" literally means bigger tap
+   areas, not just different chrome. */
+html.is-app .menu-btn,
+html.is-app .btn-icon {
+  width: 40px;
+  height: 40px;
+}
+html.is-app .chip {
+  padding: 8px 12px;
+}
+
+/* The in-page footer's GitHub link matters far more to a first-time website
+   visitor deciding whether to trust this tool than to someone who already
+   installed it from a store listing — keep it (transparency is part of
+   this app's identity either way) but let it recede rather than anchor the
+   screen the way it does on the marketing site. */
+html.is-app footer {
+  font-size: 11.5px;
+  opacity: 0.8;
+}
+
+/* Menu panel already respects safe-area at the top via .wrap above it sitting
+   under the status bar; give its own header the same top clearance when the
+   panel is opened as a full-height overlay. */
+html.is-app .menu-panel-head {
+  padding-top: calc(16px + var(--safe-top, 0px));
+}
+

@@ -1,0 +1,22 @@
+[package]
+name = "tauri-plugin-dd-native"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.77"
+description = "Native Android bridge for DD Compressor: save/share compressed files, AdMob banner + app-open ads, and UMP consent. Android-only — no-ops on desktop, since this app does not ship for iOS or other desktop platforms."
+license = "DD-Compressor-Community-License-1.0"
+links = "tauri-plugin-dd-native"
+
+[lib]
+name = "tauri_plugin_dd_native"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+log = "0.4"

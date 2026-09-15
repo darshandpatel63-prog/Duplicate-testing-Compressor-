@@ -1,0 +1,4 @@
+[default]
+description = "Default permissions for the dd-native plugin — save a compressed file to device storage, and open Google's ad-consent (privacy choices) form. These are the only two things the webview can ask the native Android side to do."
+permissions = ["allow-save-file", "allow-show-privacy-options"]
+

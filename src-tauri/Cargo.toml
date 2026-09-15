@@ -1,0 +1,41 @@
+[package]
+name = "dd-compressor"
+version = "1.0.0"
+description = "DD Compressor — privacy-first file compression, on your device, on web and Android"
+authors = ["Darshan Patel"]
+edition = "2021"
+rust-version = "1.77"
+license = "DD-Compressor-Community-License-1.0"
+repository = "https://github.com/darshandpatel63-prog/DD-COMPRESSER-PRIVACY-FIRST-COMPRESSER"
+
+[lib]
+# The name Rust code on other platforms would `use` this crate by. Android
+# loads this as a native shared library (cdylib); staticlib covers iOS if
+# ever added later; rlib keeps normal `cargo test`/tooling working.
+name = "dd_compressor_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+
+# Our own plugin: native save/share + AdMob banner & app-open ads + UMP
+# consent on Android. See /plugins/tauri-plugin-dd-native/README.md. The
+# plugin itself branches internally (src/mobile.rs vs src/desktop.rs) so it
+# is just one ordinary dependency here regardless of target platform.
+tauri-plugin-dd-native = { path = "../plugins/tauri-plugin-dd-native" }
+
+[profile.release]
+# Standard, conservative release profile — smaller binary, no debug
+# assertions left in. Nothing exotic that could interact unpredictably with
+# a build you can't fully test before shipping.
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

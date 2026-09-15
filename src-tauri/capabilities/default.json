@@ -1,0 +1,9 @@
+{
+  "identifier": "default",
+  "description": "Capabilities for DD Compressor's single window. Deliberately minimal — only this app's own dd-native plugin commands are exposed to the webview, nothing broader (no filesystem, shell, or http plugins), so the withGlobalTauri IPC surface stays as small as the two things this app actually needs natively: saving a compressed file, and opening the ad-consent form. See README 'Security notes'.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dd-native:default"
+  ]
+}
