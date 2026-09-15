@@ -59,26 +59,36 @@ jobs:
         env:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 
-      # The generated Tauri Android template currently uses Kotlin 1.9.x,
-      # while this project uses Google Mobile Ads 24.9.0, whose Kotlin
-      # metadata is newer. That mismatch causes compileDebugKotlin to fail
-      # with "binary version ... 2.2.0, expected ... 1.9.0".
-      # Upgrade only the generated Android project's Kotlin Gradle Plugin
-      # references to 2.2.0. Kotlin 2.2 is compatible with the Gradle 8.14
-      # toolchain used by this generated project.
+      # Google Mobile Ads 24.9.0 is compiled with Kotlin 2.2 metadata.
+      # The generated Tauri Android project can still contain the older
+      # Kotlin Gradle Plugin, so align every generated Gradle/Properties
+      # declaration before Gradle starts. This is intentionally limited to
+      # generated Android build configuration; application source is untouched.
       - name: Align generated Android Kotlin version
         shell: bash
         run: |
           set -euo pipefail
           ANDROID_DIR="src-tauri/gen/android"
 
-          # Replace the generated template's Kotlin 1.9.x version wherever
-          # it is declared. Do not touch application source code.
-          find "$ANDROID_DIR" -type f \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "*.toml" \) -print0 \
-            | xargs -0 sed -i -E 's/(["'"''])1\.9\.[0-9]+(["'"''])/\12.2.0\2/g'
+          # Replace any generated Kotlin 1.9.x declaration, regardless of
+          # whether it is quoted, unquoted, in Gradle, or in a properties file.
+          find "$ANDROID_DIR" -type f \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "*.toml" -o -name "*.properties" \) -print0 \
+            | xargs -0 sed -i -E 's/1\.9\.[0-9]+/2.2.0/g'
 
-          echo "Kotlin version references after alignment:"
-          grep -RInE 'kotlin.*2\.2\.0|2\.2\.0.*kotlin' "$ANDROID_DIR" --include='*.gradle' --include='*.gradle.kts' --include='*.toml' || true
+          # Kotlin stdlib may otherwise resolve to 2.1.x transitively while
+          # the compiler is being upgraded. Keep the generated Android build
+          # on the same Kotlin line explicitly.
+          find "$ANDROID_DIR" -type f \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "*.toml" -o -name "*.properties" \) -print0 \
+            | xargs -0 sed -i -E 's/kotlin-stdlib(:|\\")2\.1\.[0-9]+/kotlin-stdlib\\12.2.0/g'
+
+          echo "Remaining generated Kotlin 1.9 references (should be none):"
+          if grep -RInE '1\.9\.[0-9]+' "$ANDROID_DIR" --include='*.gradle' --include='*.gradle.kts' --include='*.toml' --include='*.properties'; then
+            echo "ERROR: generated Kotlin 1.9.x reference remains."
+            exit 1
+          fi
+
+          echo "Kotlin 2.2 references:"
+          grep -RInE '2\.2\.0|kotlin-gradle-plugin' "$ANDROID_DIR" --include='*.gradle' --include='*.gradle.kts' --include='*.toml' --include='*.properties' || true
 
       - name: Generate app icons from source artwork
         run: npx tauri icon icon-source/app-icon-1024.png
