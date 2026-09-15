@@ -1,22 +1,9 @@
 name: Build Android app
 
-# Builds the Android app entirely on GitHub's servers — no Android Studio,
-# Rust, or SDK needed on your own device, the same way the project's old
-# Capacitor build-apk.yml worked. Trigger it from the Actions tab (or push
-# to main), then download the APK/AAB from the finished run's "Artifacts"
-# section — all doable from a phone browser. See README "Building the
-# Android app" for the full walkthrough, including one-time setup.
-
+# Android APK/AAB builds are manual only. This prevents every source change
+# from automatically starting a long Android build.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "web/**"
-      - "src-tauri/**"
-      - "plugins/**"
-      - "icon-source/**"
-      - ".github/workflows/android-build.yml"
 
 concurrency:
   group: android-build-${{ github.ref }}
@@ -25,14 +12,17 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Set up JDK
         uses: actions/setup-java@v5
@@ -41,21 +31,9 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      # NDK r28+ is what makes the build produce 16KB-memory-page-aligned
-      # native libraries — a Google Play requirement for new/updated apps.
-      # See plugins/tauri-plugin-dd-native/android/build.gradle.kts for
-      # where this connects to the rest of the build.
-      #
-      # local-cache is deliberately OFF. nttld/setup-ndk's cache for recent
-      # NDK versions has a confirmed failure mode: a "hit" can restore a
-      # tree containing the small per-API clang *wrapper scripts* (e.g.
-      # aarch64-linux-android26-clang) without the actual `clang` binary
-      # those scripts exec — the build gets well into compiling before
-      # failing with "clang: No such file or directory", which is exactly
-      # what happened here. The cache only saves on the order of tens of
-      # seconds on a multi-minute job, so it isn't worth that failure mode
-      # — see https://github.com/water-rs/waterui/issues/284 for another
-      # project hitting this same action/error and landing on the same fix.
+      # NDK r28+ keeps native libraries compatible with Android's 16 KB
+      # memory-page requirement. Cache is deliberately disabled because the
+      # NDK cache can restore incomplete clang wrapper trees.
       - name: Set up Android NDK
         id: setup-ndk
         uses: nttld/setup-ndk@v1
@@ -81,20 +59,37 @@ jobs:
         env:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 
+      # The generated Tauri Android template currently uses Kotlin 1.9.x,
+      # while this project uses Google Mobile Ads 24.9.0, whose Kotlin
+      # metadata is newer. That mismatch causes compileDebugKotlin to fail
+      # with "binary version ... 2.2.0, expected ... 1.9.0".
+      # Upgrade only the generated Android project's Kotlin Gradle Plugin
+      # references to 2.2.0. Kotlin 2.2 is compatible with the Gradle 8.14
+      # toolchain used by this generated project.
+      - name: Align generated Android Kotlin version
+        shell: bash
+        run: |
+          set -euo pipefail
+          ANDROID_DIR="src-tauri/gen/android"
+
+          # Replace the generated template's Kotlin 1.9.x version wherever
+          # it is declared. Do not touch application source code.
+          find "$ANDROID_DIR" -type f \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "*.toml" \) -print0 \
+            | xargs -0 sed -i -E 's/(["'"''])1\.9\.[0-9]+(["'"''])/\12.2.0\2/g'
+
+          echo "Kotlin version references after alignment:"
+          grep -RInE 'kotlin.*2\.2\.0|2\.2\.0.*kotlin' "$ANDROID_DIR" --include='*.gradle' --include='*.gradle.kts' --include='*.toml' || true
+
       - name: Generate app icons from source artwork
         run: npx tauri icon icon-source/app-icon-1024.png
 
-      # Belt-and-braces: forces the exact API level Play Store currently
-      # requires (Android 16 / API 36, required since Aug 31, 2026),
-      # regardless of what the installed Tauri CLI's own template
-      # defaults to. See README "If the Android build fails" if this
-      # sed pattern ever stops matching a future template's formatting.
+      # Force the Android API level required for new/updated apps.
       - name: Ensure compileSdk/targetSdk 36
         run: |
           sed -i -E 's/compileSdk\s*=\s*[0-9]+/compileSdk = 36/' src-tauri/gen/android/app/build.gradle.kts
           sed -i -E 's/targetSdk\s*=\s*[0-9]+/targetSdk = 36/' src-tauri/gen/android/app/build.gradle.kts
 
-      - name: Build debug APK (unsigned, always builds — good for sideloading/testing)
+      - name: Build debug APK (unsigned, for sideloading/testing)
         run: npx tauri android build --apk --debug
         env:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
@@ -104,13 +99,10 @@ jobs:
         with:
           name: DD-Compressor-debug-apk
           path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
-          if-no-files-found: warn
+          if-no-files-found: error
 
-      # Release builds need your own signing key — see README "Signing a
-      # release build" for how to generate one and add these four repo
-      # secrets. Until they're added, this step (and the two after it) are
-      # skipped and only the debug APK above is produced — the workflow
-      # still succeeds either way.
+      # Release builds require the four signing secrets. If they are not
+      # configured, only the debug APK above is produced.
       - name: Set up release signing
         if: ${{ env.HAS_SIGNING == 'true' }}
         env:
@@ -124,7 +116,7 @@ jobs:
           storeFile=release.keystore
           PROPS
 
-      - name: Build signed release (AAB for Play Store, APK for other stores/direct install)
+      - name: Build signed release (AAB + APK)
         if: ${{ env.HAS_SIGNING == 'true' }}
         env:
           HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
@@ -143,5 +135,4 @@ jobs:
           path: |
             src-tauri/gen/android/app/build/outputs/bundle/**/*.aab
             src-tauri/gen/android/app/build/outputs/apk/**/*.apk
-          if-no-files-found: warn
-          
+          if-no-files-found: error
