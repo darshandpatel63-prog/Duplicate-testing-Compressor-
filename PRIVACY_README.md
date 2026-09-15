@@ -28,12 +28,6 @@ Permissions are requested only when required for file selection, processing, sav
 
 The project follows a privacy-first approach and aims to keep file processing local wherever supported. However, no software can guarantee absolute security. Users should keep their device and operating system updated and avoid selecting files they do not want the application to process.
 
-## Full Privacy Policy
-
-The public Privacy Policy is available here:
-
-**https://darshandpatel63-prog.github.io/Duplicate-testing-Compressor-/privacy.html**
-
 ## Policy updates
 
 This documentation and the public Privacy Policy may be updated when the application's features or data practices change. The latest published version should be treated as authoritative.
